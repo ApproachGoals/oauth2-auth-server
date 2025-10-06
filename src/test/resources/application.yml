@@ -1,0 +1,38 @@
+server:
+  port: 9100
+  servlet:
+    context-path: /auth
+
+authorization:
+  server:
+    issuer: "http://localhost:9100/auth"
+
+jwt:
+  private-key: private_key.pem
+  public-key: public_key.pem
+  expiration-seconds: 3600
+  refresh-expiration-seconds: 86400
+
+spring:
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          issuer-uri: https://auth.swc.iot
+  datasource:
+    url: jdbc:h2:mem:authdb;DB_CLOSE_DELAY=-1;MODE=MYSQL
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  redis:
+    host: 85.214.241.230
+    port: 6379
+
+logging:
+  level:
+    org.springframework: INFO
+    com.example: DEBUG
