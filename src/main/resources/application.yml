@@ -40,7 +40,16 @@ spring:
     port: 6379
     timeout: 5000ms
     password: ${redis.password}
-
+eureka:
+  client:
+    service-url:
+      defaultZone: ${eureka.defaultzone:http://eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
 logging:
   level:
     org.springframework: INFO
