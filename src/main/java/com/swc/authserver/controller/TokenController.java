@@ -76,12 +76,17 @@ public class TokenController {
     }
 
     private void saveInRedis(String username, Optional<User> user, String tokenId) {
-        Map<String, String> redisData = new HashMap<>();
-        redisData.put("username", username);
-        redisData.put("roles", String.join(",", jwtUtils.getRolesAsArray(user.get().getRoles())));
-        redisData.put("permissions", String.join(",", jwtUtils.getPermissionsAsArray(user.get().getPermissions())));
-        redisTemplate.opsForHash().putAll("token:" + tokenId, redisData);
-        redisTemplate.expire("token:" + tokenId, Duration.ofSeconds(expirationSeconds));
+        try {
+            Map<String, String> redisData = new HashMap<>();
+            redisData.put("username", username);
+            redisData.put("roles", String.join(",", jwtUtils.getRolesAsArray(user.get().getRoles())));
+            redisData.put("permissions", String.join(",", jwtUtils.getPermissionsAsArray(user.get().getPermissions())));
+            redisTemplate.opsForHash().putAll("token:" + tokenId, redisData);
+            redisTemplate.expire("token:" + tokenId, Duration.ofSeconds(expirationSeconds));
+        } catch (Exception e) {
+            log.error("cannot save token on redis", e);
+        }
+
     }
 
     @Operation(
@@ -139,9 +144,11 @@ public class TokenController {
                     .build();
             return ResponseEntity.ok(jwtResponse);
         } catch (Exception e) {
+            log.error("getToken error", e);
+            e.printStackTrace();
             return new ResponseEntity<>(GeneralErrorResponse.builder()
                     .timestamp(Instant.now())
-                    .message("Internal Error")
+                    .message("Internal Error:"+e.getMessage())
                     .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                     .build(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
