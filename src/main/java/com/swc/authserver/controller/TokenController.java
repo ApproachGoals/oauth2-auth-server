@@ -3,6 +3,8 @@ package com.swc.authserver.controller;
 import com.swc.authserver.entities.User;
 import com.swc.authserver.models.GeneralErrorResponse;
 import com.swc.authserver.models.JwtResponse;
+import com.swc.authserver.models.TokenValidationRequest;
+import com.swc.authserver.models.TokenValidationResponse;
 import com.swc.authserver.repository.UserRepository;
 import com.swc.authserver.utils.JwtUtils;
 import com.nimbusds.jose.JOSEException;
@@ -63,7 +65,7 @@ public class TokenController {
         String tokenId = UUID.randomUUID().toString();
         String token = jwtUtils.generateToken(username, user.get().getRoles(), user.get().getPermissions(), tokenId, expirationSeconds, jwkSource);
 
-        saveInRedis(username, user, tokenId);
+        jwtUtils.saveInRedis(username, user, tokenId, token, expirationSeconds);
 
         JwtResponse jwtResponse = JwtResponse.builder()
                 .accessToken(token)
@@ -73,20 +75,6 @@ public class TokenController {
                 .success(true)
                 .build();
         return ResponseEntity.ok(jwtResponse);
-    }
-
-    private void saveInRedis(String username, Optional<User> user, String tokenId) {
-        try {
-            Map<String, String> redisData = new HashMap<>();
-            redisData.put("username", username);
-            redisData.put("roles", String.join(",", jwtUtils.getRolesAsArray(user.get().getRoles())));
-            redisData.put("permissions", String.join(",", jwtUtils.getPermissionsAsArray(user.get().getPermissions())));
-            redisTemplate.opsForHash().putAll("token:" + tokenId, redisData);
-            redisTemplate.expire("token:" + tokenId, Duration.ofSeconds(expirationSeconds));
-        } catch (Exception e) {
-            log.error("cannot save token on redis", e);
-        }
-
     }
 
     @Operation(
@@ -133,19 +121,17 @@ public class TokenController {
             String token = jwtUtils.generateToken(username, user.get().getRoles(), user.get().getPermissions(), tokenId, expirationSeconds, jwkSource);
 
             // save into Redis
-            saveInRedis(username, user, tokenId);
+            jwtUtils.saveInRedis(username, user, tokenId, token, expirationSeconds);
 
-            JwtResponse jwtResponse = JwtResponse.builder()
+            return ResponseEntity.ok(JwtResponse.builder()
                     .accessToken(token)
                     .expiresIn(Long.valueOf(expirationSeconds))
                     .tokenType("Bearer")
                     .tokenId(tokenId)
                     .success(true)
-                    .build();
-            return ResponseEntity.ok(jwtResponse);
+                    .build());
         } catch (Exception e) {
             log.error("getToken error", e);
-            e.printStackTrace();
             return new ResponseEntity<>(GeneralErrorResponse.builder()
                     .timestamp(Instant.now())
                     .message("Internal Error:"+e.getMessage())
@@ -201,22 +187,50 @@ public class TokenController {
         redisTemplate.opsForHash().putAll("token:" + newTokenId, data);
         redisTemplate.expire("token:" + newTokenId, Duration.ofSeconds(expirationSeconds));
 
-        JwtResponse jwtResponse = JwtResponse.builder()
+        return ResponseEntity.ok(JwtResponse.builder()
                 .accessToken(token)
                 .expiresIn(Long.valueOf(expirationSeconds))
                 .tokenType("Bearer")
                 .tokenId(newTokenId)
                 .success(true)
-                .build();
-        return ResponseEntity.ok(jwtResponse);
+                .build());
+    }
+    @Operation(
+            summary = "validate JWT token",
+            description = "validate JWT token"
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Success",
+                    content = @Content(schema = @Schema(implementation = TokenValidationResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Invalid credentials",
+                    content = @Content(schema = @Schema(implementation = TokenValidationResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Internal error",
+                    content = @Content(schema = @Schema(implementation = TokenValidationResponse.class))
+            )
+    })
+    @GetMapping("/validate")
+    public ResponseEntity<?> validateToken(@RequestHeader(value = "Authorization", required = true) String authHeader) {
+        return jwtUtils.validateToken(extractToken(authHeader));
     }
 
-    @GetMapping("/validate")
-    public ResponseEntity<?> validateToken(@RequestParam String tokenId) {
-        Map<Object, Object> data = redisTemplate.opsForHash().entries("token:" + tokenId);
-        if (data == null || data.isEmpty()) {
-            return ResponseEntity.status(401).body("Token invalid or expired");
+    private String extractToken(String authHeader) {
+        // 从Authorization头提取token
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
         }
-        return ResponseEntity.ok(data);
+
+        return null;
     }
 }

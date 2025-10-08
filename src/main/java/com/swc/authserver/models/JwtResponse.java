@@ -1,12 +1,11 @@
 package com.swc.authserver.models;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder(toBuilder = true)
@@ -14,12 +13,13 @@ import lombok.NoArgsConstructor;
 public class JwtResponse {
     private String accessToken;
     private String refreshToken;
+    @Builder.Default
     private String tokenType = "Bearer";
     private Long expiresIn;
     private String tokenId;
     private String message;
     private Boolean success;
-
+/*
     public JwtResponse(String accessToken, String refreshToken, Long expiresIn, String message) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
@@ -31,5 +31,5 @@ public class JwtResponse {
     public JwtResponse(String message, Boolean success) {
         this.message = message;
         this.success = success;
-    }
+    }*/
 }
